@@ -4,7 +4,7 @@ set +x
 
 ## LOAD CONFIG
 fn_load_config(){
-	configfile='./ramode.conf'
+	configfile='./cfg/ramode.conf'
 	configfile_secured='/tmp/ramode.cfg'
 
 	# check if the file contains something we don't want
@@ -17,8 +17,6 @@ fn_load_config(){
 
 	# now source it, either the original or the filtered variant
 	source "$configfile"
-
-
 
 }
 
@@ -48,6 +46,7 @@ fn_prepare_env(){
 
 	ext='jpg'
 	FFMPEG='ffmpeg'
+	cfg_dir='./cfg'
 	command -v $FFMPEG >/dev/null 2>&1 || { FFMPEG=avconv ; }
 
 	
@@ -72,7 +71,17 @@ fn_capture_frame(){
         # $FFMPEG -loglevel fatal -f video4linux2 -i /dev/video0 -r 1 -t 0.0001 $FILENAME
 		
 		# raspberry pi
-		fswebcam -q -d v4l2:/dev/video0 -r 1280x1024 "$tmp_img_dir/$1.$ext"
+		scource "$cfg_dir/fswebcam.conf"
+ 
+		fswebcam -q -d v4l2:/dev/video0 \
+			-r 1280x1024 \
+			--set brightness=$brightness \
+			--set contrast=$contrast \
+			--set saturation=$saturation \
+			--set hue=$hue \
+			--set gamma=$gamma \
+			--set gain=$gain \
+			"$tmp_img_dir/$1.$ext"
 	fi
 
 }
