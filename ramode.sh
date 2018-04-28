@@ -1,9 +1,6 @@
 #!/bin/bash
 
-
-
-
-
+set +x
 
 ## LOAD CONFIG
 fn_load_config(){
@@ -32,12 +29,11 @@ fn_prepare_env(){
 	echo "Check directory"
 	
 	WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-	tmp_img_dir=${IMG_TMP_DIR:-${WORKSPACE}/img_temp}
-    report_dir=${REPORT_DIR:-${WORKSPACE}/report}
+	tmp_img_dir=${IMG_TMP_DIR:-$WORKSPACE/img_temp}
+        report_dir=${REPORT_DIR:-$WORKSPACE/report}
 	tollerance=${TOLLERANCE:-100}
 	capture_interval=${CAPTURE_INTERVAL:-1}
-	terminated=${ONE_ITERATIOM:-false}
-
+	one_iteration=${ONE_ITERATIOM:-true}
 	
 	if [ ! -d "$report_dir" ]; then
   		# Control will enter here if $DIRECTORY doesn't exist.
@@ -50,7 +46,7 @@ fn_prepare_env(){
 		exit 1
 	fi
 
-	ext='.jpg'
+	ext='jpg'
 	FFMPEG='ffmpeg'
 	command -v $FFMPEG >/dev/null 2>&1 || { FFMPEG=avconv ; }
 
@@ -64,7 +60,7 @@ fn_terminate_script() {
 }
 
 fn_cleanup() {
-	rm -rf "$tmp_img_dir/*" 
+  rm -rf $tmp_img_dir/*
 }
 
 fn_capture_frame(){
@@ -84,13 +80,13 @@ fn_capture_frame(){
 fn_compare_frame(){
 	# $1 revius
 	# $2 new file
-	if [[ "$1" != "" ]]; then
+	if [[ "$tmp_img_dir/$1.$ext" != "" ]]; then
 		#echo "Comparing..."
 		# For some reason, `compare` outputs the result to stderr so
 		# it's not possibly to directly get the result. It needs to be
 		# redirected to a temp file first.
 		
-		compare -fuzz 20% -metric ae $1 $2 "$tmp_img_dir/diff.png" 2> "$tmp_img_dir/diff.txt"
+		compare -fuzz 20% -metric ae $tmp_img_dir/$1.$ext $tmp_img_dir/$2.$ext "$tmp_img_dir/diff.png" 2> "$tmp_img_dir/diff.txt"
 		
 		DIFF="$(cat $tmp_img_dir/diff.txt)"
 		
@@ -98,12 +94,16 @@ fn_compare_frame(){
 		if [ "$DIFF" -lt $tollerance ]; then
 			fn_no_motion_detected $1 $2 $DIFF
 		else
-			fn_motion_detected $1 $2 $DIFF	
+			file_a=$tmp_img_dir/$2A.$ext
+			file_b=$tmp_img_dir/$2B.$ext
+			cp $tmp_img_dir/$1.$ext  $file_a
+			cp $tmp_img_dir/$2.$ext  $file_b
+			fn_motion_detected $2 $file_a $file_b $DIFF &
 		fi
 
 		rm -f "$tmp_img_dir/diff.png"
 		rm -f "$tmp_img_dir/diff.txt"
-	
+
 	fi	
 }
 
@@ -112,21 +112,37 @@ fn_no_motion_detected(){
 }
 
 fn_motion_detected(){
-	echo "Diff = $3 [***]"
-	convert -delay 50 "$1" "$2" -loop 0 "$report_dir/$1_$2_motion.gif"
-	cp "$tmp_img_dir/$2.$ext" "$report_dir/$2.$ext"
+	echo "Diff = $4 [***]"
+	convert -delay 50 "$2" "$3" -loop 0 "$report_dir/$1_motion.gif"
+	rm -f "$2"
+	mv "$3" "$report_dir/$1.$ext"
 }
 
 fn_update_upstream(){
-	cp $1 "$tmp_img_dir/now.$ext"
+	cp "$tmp_img_dir/$1.$ext" "$tmp_img_dir/now.$ext"
 }
 
-fn_swap_frame(){
-	1="$2"
-}
 
 fn_wait(){
 	sleep "$1"
+}
+
+fn_main(){
+
+	new_frame="$(date +"%Y%m%dT%H%M%S")"
+
+	fn_capture_frame "$new_frame"
+
+	fn_update_upstream "$new_frame"
+
+	fn_compare_frame "$base_frame" "$new_frame" 
+    
+	rm -f "$tmp_img_dir/$base_frame.$ext"
+	
+	base_frame="$new_frame" 
+	
+	fn_wait "$capture_interval"
+	
 }
 
 
@@ -135,18 +151,7 @@ fn_prepare_env
 fn_cleanup
 base_frame="$(date +"%Y%m%dT%H%M%S")"
 fn_capture_frame "$base_frame"
-
-while not $terminated ; do
-
-	new_frame="$(date +"%Y%m%dT%H%M%S")"
-	fn_capture_frame "$new_frame"
-
-	fn_update_upstream "$new_frame"
-
-	fn_compare_frame "$base_frame" "$new_frame" 
-
-	fn_swap_frame "$base_frame" "$new_frame" 
-    
-	fn_wait "$capture_interval"
-	
+fn_main
+while [ false = $one_iteration ] ; do
+   fn_main
 done
