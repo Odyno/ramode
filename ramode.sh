@@ -71,10 +71,14 @@ fn_capture_frame(){
         # $FFMPEG -loglevel fatal -f video4linux2 -i /dev/video0 -r 1 -t 0.0001 $FILENAME
 		
 		# raspberry pi
-		scource "$cfg_dir/fswebcam.conf"
+		source "$cfg_dir/fswebcam.conf"
  
-		fswebcam -q -d v4l2:/dev/video0 \
-			-r 1280x1024 \
+		fswebcam -q \
+			-d v4l2:/dev/video0 \
+			-i 0 \
+			-S 1 \
+			-F 2 \
+			-r 640x480 \
 			--set brightness=$brightness \
 			--set contrast=$contrast \
 			--set saturation=$saturation \

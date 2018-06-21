@@ -1,0 +1,9 @@
+srl:
+    host: localhost
+    user: root
+    passwd: my secret password
+msg:
+    from: tvcc@staniscia.net
+    to: alessandro@staniscia.net
+    subject: Ciao
+    body:
